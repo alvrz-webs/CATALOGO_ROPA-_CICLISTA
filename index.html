@@ -510,6 +510,22 @@
   .field textarea{resize:vertical; min-height:80px; font-family:'Inter',sans-serif;}
 
   .submit-row{margin-top:26px; display:flex; align-items:center; gap:18px; flex-wrap:wrap;}
+  .pay-block{
+    margin-top:28px; padding-top:24px; border-top:1px solid var(--line);
+  }
+  .pay-total-row{
+    display:flex; align-items:baseline; justify-content:space-between;
+    margin-bottom:18px; padding-bottom:16px; border-bottom:1px dashed var(--line-2);
+  }
+  .pay-total-row span{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-text-dim);}
+  .pay-total-row b{font-size:26px; color:var(--ink-text); font-family:'Big Shoulders Display',sans-serif;}
+  #paypal-button-container{min-height:48px; margin-bottom:10px;}
+  #paypal-button-container.disabled{opacity:.45; pointer-events:none;}
+  .pay-secure-note{
+    display:flex; align-items:center; gap:8px;
+    font-size:11.5px; color:var(--ink-text-dim); line-height:1.5; margin-top:4px;
+  }
+  .pay-secure-note svg{width:15px; height:15px; flex-shrink:0; color:var(--ink-text-dim);}
   .form-msg{font-size:13px; color:#FF8A6B; font-family:'JetBrains Mono',monospace;}
   .form-msg.ok{color:#5FD3A0;}
 
@@ -787,11 +803,11 @@
           <span class="line"></span>
         </div>
         <h2>Elige tu<br>equipación.</h2>
-        <p>Marca las prendas que te interesan, indica talla, corte y color, y déjanos tu contacto. No hay pago aquí: solo reservamos tu pedido.</p>
+        <p>Marca las prendas que te interesan, indica talla, corte y color, déjanos tu contacto y paga de forma segura con PayPal.</p>
         <div class="steps">
           <div class="step"><div class="num">01</div><div class="txt"><b>Selecciona</b> gorra y/o camisetas de la lista.</div></div>
           <div class="step"><div class="num">02</div><div class="txt"><b>Indica</b> talla, corte (chico o chica), color y cantidad.</div></div>
-          <div class="step"><div class="num">03</div><div class="txt"><b>Déjanos tu contacto</b> y confirmamos disponibilidad.</div></div>
+          <div class="step"><div class="num">03</div><div class="txt"><b>Paga con PayPal</b> — tarjeta o saldo PayPal, sin salir de la página.</div></div>
         </div>
       </div>
 
@@ -824,9 +840,17 @@
             </div>
           </div>
 
-          <div class="submit-row">
-            <button type="submit" class="btn btn-solid">Generar resumen del pedido</button>
+          <div class="pay-block">
+            <div class="pay-total-row">
+              <span>Total a pagar</span>
+              <b id="payTotalAmount">0,00 €</b>
+            </div>
+            <div id="paypal-button-container"></div>
             <span class="form-msg" id="formMsg"></span>
+            <div class="pay-secure-note">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Pago seguro procesado por PayPal. No vemos ni guardamos los datos de tu tarjeta.
+            </div>
           </div>
         </form>
       </div>
@@ -907,7 +931,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
     </div>
     <h1 class="thanks-title">¡Gracias por<br>tu pedido!</h1>
-    <p class="thanks-sub">Hemos guardado tu selección — lo tienes también aquí abajo, en modo lista. Si quieres, también puedes pedir factura o escribirnos por WhatsApp.</p>
+    <p class="thanks-sub">Hemos recibido tu pago y guardado tu pedido — lo tienes también aquí abajo, en modo lista. Si quieres, también puedes pedir factura o escribirnos por WhatsApp.</p>
 
     <div class="thanks-summary print-area" id="thanksPrintArea">
       <div class="thanks-summary-head">
@@ -1057,6 +1081,16 @@ const ISSUER_NAME = "H. Álvarez";
 const ISSUER_CIF = "49230698A";
 const ISSUER_ADDRESS = "Carrer Terra Vella, 21";
 const ISSUER_ZIP_CITY = "AD500 Andorra la Vella, Andorra";
+/* =================================================== */
+
+/* ================= PAYPAL (EDITAR AL PASAR A LIVE) =================
+   Ahora mismo puesto el Client ID de SANDBOX (modo pruebas, dinero falso).
+   Cuando quieras cobrar de verdad: entra en tu panel de PayPal Developer,
+   cambia el interruptor a "Live", copia ese Client ID y sustitúyelo aquí
+   abajo. El Secret NUNCA va en este archivo — ese se pone directamente
+   en las variables de entorno de Netlify (PAYPAL_SECRET), y debe
+   corresponder al MISMO modo (sandbox o live) que este Client ID. */
+const PAYPAL_CLIENT_ID = "AdPLh03TqFisYnDQ9k-39tD-a-LKN0_Vf4_xqe_fYnsN5QWpKgbeJVbz03u2stpGnARSeyNoCbDfxTat";
 /* =================================================== */
 
 /* ================= PRECIOS (EDITAR) =================
@@ -1543,6 +1577,7 @@ function renderAllCartViews(){
   renderPicker();
   if(cartModal.classList.contains('open')) renderCartDrawer();
   updateCartBadge();
+  if(typeof updatePayTotal === 'function') updatePayTotal();
 }
 
 function openCart(){
@@ -1690,9 +1725,9 @@ function buildConfirmationEmailHTML(contact, items, total, orderNumber, fecha, h
   </tr></table>`:''}
 </td></tr>
 <tr><td style="padding:8px 28px 24px;">
-  <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#1240DB;font-weight:700;margin-bottom:8px;margin-top:10px;">Detalles de tu reserva</div>
+  <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#1240DB;font-weight:700;margin-bottom:8px;margin-top:10px;">Detalles del pago</div>
   <div style="font-size:13px;color:#374151;line-height:1.6;background:#F9FAFB;border-radius:6px;padding:14px 16px;">
-    Este pedido es una <b>reserva</b>: todavía no se ha realizado ningún cobro. Cuando confirmemos la disponibilidad, coordinamos contigo el pago y la entrega.
+    Pago recibido correctamente a través de <b>PayPal</b>. Nos pondremos en contacto contigo para confirmar la disponibilidad y coordinar la entrega.
   </div>
 </td></tr>
 <tr><td style="padding:20px 28px 28px;border-top:1px solid #E5E7EB;">
@@ -1728,7 +1763,7 @@ function sendConfirmationEmail(){
 
   const linesText = items.map(it=>`- ${it.name}${it.ref?` (Ref. ${it.ref})`:''} — ${it.detail} · x${it.qty}${it.unitPrice>0?` — ${it.lineTotal.toFixed(2)} €`:''}`).join('\n');
   const totalText = total>0 ? `\n\nTOTAL: ${total.toFixed(2)} €` : '';
-  const plainBody = `Hola ${lastOrderContact.name},\n\nPedido #${orderNumber} · ${fecha}, ${hora}\n\nHemos recibido tu selección para la colección First Edition de H. Álvarez × Toyota Valencia.\n\nResumen de tu pedido:\n${linesText}${totalText}\n\nEste pedido es una reserva: todavía no se ha realizado ningún cobro. Nos pondremos en contacto contigo en las próximas 24-48h para confirmar la disponibilidad y coordinar el pago y la entrega.\n\nUn saludo,\nH. Álvarez`;
+  const plainBody = `Hola ${lastOrderContact.name},\n\nPedido #${orderNumber} · ${fecha}, ${hora}\n\nHemos recibido tu pago para la colección First Edition de H. Álvarez × Toyota Valencia.\n\nResumen de tu pedido:\n${linesText}${totalText}\n\nPago recibido correctamente a través de PayPal. Nos pondremos en contacto contigo en las próximas 24-48h para confirmar la disponibilidad y coordinar la entrega.\n\nUn saludo,\nH. Álvarez`;
   const htmlBody = buildConfirmationEmailHTML(lastOrderContact, items, total, orderNumber, fecha, hora);
 
   sendToSheet({
@@ -1817,7 +1852,7 @@ function renderInvoiceDoc(client){
       <div><span>IVA (21%)</span><b>${vat.toFixed(2)} €</b></div>
       <div class="invoice-total-final"><span>TOTAL FACTURA</span><b>${total.toFixed(2)} €</b></div>
     </div>
-    <div class="invoice-legal">Precios orientativos de la colección First Edition mientras se confirma la tarifa oficial. Factura generada digitalmente por H. Álvarez × Toyota Valencia. Para cualquier consulta sobre este documento, contacta directamente con H. Álvarez.</div>
+    <div class="invoice-legal">Pedido pagado a través de PayPal. Factura generada digitalmente por H. Álvarez × Toyota Valencia. Para cualquier consulta sobre este documento, contacta directamente con H. Álvarez.</div>
   `;
 }
 
@@ -1875,12 +1910,26 @@ document.getElementById('invoiceForm').addEventListener('submit', e=>{
   invoiceModal.scrollTop = 0;
 });
 
-/* ---------- form submit -> página de agradecimiento ---------- */
+/* ---------- validación + pago con PayPal + página de agradecimiento ---------- */
 const form = document.getElementById('orderForm');
 const formMsg = document.getElementById('formMsg');
+const payTotalAmountEl = document.getElementById('payTotalAmount');
 
-form.addEventListener('submit', e=>{
-  e.preventDefault();
+function computeCartTotal(){
+  return Object.values(cartLines).reduce((s,l)=>{
+    const qty = Number(l.qty)||1;
+    return s + (PRICES[l.productId]||0) * qty;
+  }, 0);
+}
+function updatePayTotal(){
+  payTotalAmountEl.textContent = computeCartTotal().toFixed(2).replace('.', ',') + ' €';
+}
+updatePayTotal();
+
+/* Comprueba que el pedido está completo antes de dejar pagar.
+   No hace falta prevenir el submit del <form>: ya no hay ningún
+   botón type="submit" dentro, así que Enter no lo dispara. */
+function validateOrderForm(){
   const lineIds = Object.keys(cartLines);
   const name = document.getElementById('fName').value.trim();
   const phone = document.getElementById('fPhone').value.trim();
@@ -1888,23 +1937,31 @@ form.addEventListener('submit', e=>{
   const notes = document.getElementById('fNotes').value.trim();
 
   if(lineIds.length===0){
-    formMsg.textContent = 'Selecciona al menos una prenda antes de continuar.';
+    formMsg.textContent = 'Selecciona al menos una prenda antes de pagar.';
     formMsg.className = 'form-msg';
-    return;
+    return {valid:false};
   }
   if(!name || !phone){
     formMsg.textContent = 'Nombre y teléfono son obligatorios.';
     formMsg.className = 'form-msg';
-    return;
+    return {valid:false};
   }
   if(!isValidPhone(phone)){
     formMsg.textContent = 'Revisa el teléfono: 9 dígitos, o 12 con el prefijo (ej. +34600123456).';
     formMsg.className = 'form-msg';
-    return;
+    return {valid:false};
   }
   formMsg.textContent = '';
   formMsg.className = 'form-msg';
+  return {valid:true, name, phone, email, notes};
+}
 
+/* Se llama SOLO después de que PayPal confirme que el cobro se ha
+   completado de verdad (capturado en el servidor, no solo aprobado
+   en el navegador). Construye el resumen, registra el pedido en la
+   hoja (con la referencia del pago) y abre la página de gracias. */
+function finalizeOrder(name, phone, email, notes, paypalOrderId, capturedAmount){
+  const lineIds = Object.keys(cartLines);
   const itemsEl = document.getElementById('summaryItems');
   let lines = [];
   let total = 0;
@@ -1924,10 +1981,10 @@ form.addEventListener('submit', e=>{
     return `<div class="summary-item"><div class="sname">${p.name}</div><div class="smeta">${meta}</div></div>`;
   }).join('');
 
-  const totalLine = total>0 ? `\nTOTAL: ${total.toFixed(2)} €` : '';
+  const totalLine = total>0 ? `\nTOTAL PAGADO: ${total.toFixed(2)} €` : '';
 
   const contactEl = document.getElementById('summaryContact');
-  contactEl.innerHTML = `<b style="color:var(--ink-text)">${name}</b><br>${phone}${email?(' · '+email):''}${notes?('<br><br>'+notes):''}${total>0?`<br><br><b style="color:var(--ink-text); font-size:15px;">TOTAL: ${total.toFixed(2)} €</b>`:''}`;
+  contactEl.innerHTML = `<b style="color:var(--ink-text)">${name}</b><br>${phone}${email?(' · '+email):''}${notes?('<br><br>'+notes):''}${total>0?`<br><br><b style="color:var(--ink-text); font-size:15px;">TOTAL PAGADO: ${total.toFixed(2)} €</b><br><span style="font-size:11px;">Ref. pago PayPal: ${paypalOrderId}</span>`:''}`;
 
   const now = new Date();
   const pad = n=>String(n).padStart(2,'0');
@@ -1938,7 +1995,8 @@ form.addEventListener('submit', e=>{
   /* ---- registrar el pedido en la hoja de cálculo ---- */
   const columnKeys = buildColumnKeys();
   const headers = ['Fecha','Hora','Nombre','Teléfono','Email','Comentarios', ...columnKeys, 'Precio Total (€)'];
-  const values  = { 'Fecha':fecha, 'Hora':hora, 'Nombre':name, 'Teléfono':phone, 'Email':email, 'Comentarios':notes };
+  const notesForSheet = notes + (notes?'\n':'') + `[Pagado con PayPal · ID ${paypalOrderId} · ${(capturedAmount!=null?capturedAmount:total.toFixed(2))} €]`;
+  const values  = { 'Fecha':fecha, 'Hora':hora, 'Nombre':name, 'Teléfono':phone, 'Email':email, 'Comentarios':notesForSheet };
   columnKeys.forEach(k=> values[k]=0);
   lineIds.forEach(lineId=>{
     const l = cartLines[lineId];
@@ -1966,7 +2024,80 @@ form.addEventListener('submit', e=>{
 
   openThanks();
   sendConfirmationEmail(); // se envía solo, sin que el cliente tenga que pulsar nada
-});
+}
+
+/* ---------- botones de PayPal ---------- */
+(function loadPayPalSDK(){
+  const s = document.createElement('script');
+  s.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=EUR&intent=capture`;
+  s.onload = initPayPalButtons;
+  s.onerror = ()=>{ formMsg.textContent = 'No se pudo cargar PayPal. Recarga la página o inténtalo más tarde.'; formMsg.className = 'form-msg'; };
+  document.head.appendChild(s);
+})();
+
+function initPayPalButtons(){
+  paypal.Buttons({
+    style: { color:'blue', shape:'rect', label:'pay', height:48 },
+
+    onClick: function(data, actions){
+      const v = validateOrderForm();
+      if(!v.valid) return actions.reject();
+      return actions.resolve();
+    },
+
+    createOrder: async function(){
+      const v = validateOrderForm();
+      const items = Object.keys(cartLines).map(id=>({ productId: cartLines[id].productId, qty: Number(cartLines[id].qty)||1 }));
+      const res = await fetch('/.netlify/functions/create-paypal-order', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ items })
+      });
+      if(!res.ok){
+        formMsg.textContent = 'No se pudo iniciar el pago. Inténtalo de nuevo en unos segundos.';
+        formMsg.className = 'form-msg';
+        throw new Error('create-paypal-order failed');
+      }
+      const orderData = await res.json();
+      return orderData.id;
+    },
+
+    onApprove: async function(data){
+      formMsg.textContent = 'Confirmando el pago…';
+      formMsg.className = 'form-msg';
+      try{
+        const res = await fetch('/.netlify/functions/capture-paypal-order', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ orderId: data.orderID })
+        });
+        const captureData = await res.json();
+        if(res.ok && captureData.status === 'COMPLETED'){
+          const v = validateOrderForm();
+          finalizeOrder(v.name, v.phone, v.email, v.notes, data.orderID, captureData.capturedAmount);
+        } else {
+          formMsg.textContent = 'El pago no se completó. Si se te ha cobrado, escríbenos y lo revisamos — no se ha creado ningún pedido.';
+          formMsg.className = 'form-msg';
+        }
+      }catch(err){
+        formMsg.textContent = 'Hubo un problema confirmando el pago. Si se te ha cobrado, escríbenos y lo revisamos.';
+        formMsg.className = 'form-msg';
+      }
+    },
+
+    onCancel: function(){
+      formMsg.textContent = 'Pago cancelado. Puedes intentarlo de nuevo cuando quieras.';
+      formMsg.className = 'form-msg';
+    },
+
+    onError: function(){
+      formMsg.textContent = 'Ha ocurrido un error al procesar el pago. Inténtalo de nuevo.';
+      formMsg.className = 'form-msg';
+    }
+
+  }).render('#paypal-button-container');
+}
+
 
 
 /* ---------- scroll reveal ---------- */
